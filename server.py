@@ -56,6 +56,15 @@ def handle_client(conn, addr):
                                 player_conn.send(json.dumps({"status": "player_left"}).encode("utf-8"))
                     current_room_id = None
 
+            elif action == "send_message":
+                # Broadcast message to all players in the current room
+                if current_room_id:
+                    chat_message = message["text"]
+                    sender = message["sender"]
+                    with lock:
+                        for player_conn in rooms[current_room_id]["players"]:
+                            player_conn.send(json.dumps({"status": "new_message", "sender": sender, "text": chat_message}).encode("utf-8"))
+
     except Exception as e:
         print(f"Error with client {addr}: {e}")
 
