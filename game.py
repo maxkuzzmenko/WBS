@@ -4,16 +4,16 @@ import json
 import pygame
 import sys
 
-# Server IP and Port
-SERVER_IP = ("127.0.0.1")  # Replace with your server's IP address
-SERVER_PORT = 5555
+# Server IP and Port (Use your server's public IP address and port here)
+SERVER_IP = "0.tcp.eu.ngrok.io"
+SERVER_PORT = 11094
 
 # Initialize pygame
 pygame.init()
 
 # Constants
 WIDTH, HEIGHT = 800, 600
-FPS = 60
+FPS = 75
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
@@ -22,7 +22,7 @@ BLACK = (0, 0, 0)
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Platformer Game with Network Multiplayer")
+pygame.display.set_caption("Platformer Game with Network Multiplayer and Chat")
 clock = pygame.time.Clock()
 
 # Player properties
@@ -47,37 +47,88 @@ player_data = {
     "slash_timer": 0
 }
 other_players = {}
+current_room_id = None
 
 # Platform properties
 platforms = [pygame.Rect(0, 550, 800, 10)]
 
-# Socket setup
+# Connect to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((SERVER_IP, SERVER_PORT))
 
-# Function to send player data to the server
-def send_data():
-    while True:
-        try:
-            client_socket.send(json.dumps(player_data).encode("utf-8"))
-        except:
-            break
 
-# Function to receive data from the server
-def receive_data():
+# Function to receive messages from the server
+def receive_messages():
     global other_players
     while True:
         try:
             data = client_socket.recv(1024).decode("utf-8")
             if data:
-                other_players = json.loads(data)
+                message = json.loads(data)
+
+                # Handle different types of messages from the server
+                if message["status"] == "new_message":
+                    print(f"{message['sender']}: {message['text']}")
+                elif message["status"] == "player_joined":
+                    print("A new player has joined the room.")
+                elif message["status"] == "player_left":
+                    print("A player has left the room.")
+                elif message["status"] == "room_created":
+                    global current_room_id
+                    current_room_id = message["room_id"]
+                    print(f"Room created. Room ID: {current_room_id}")
+                elif message["status"] == "joined_room":
+                    current_room_id = message["room_id"]
+                    print(f"Joined room: {current_room_id}")
+                elif message["status"] == "update_players":
+                    other_players = message["players"]
+        except Exception as e:
+            print("Connection error:", e)
+            break
+
+
+# Start receiving messages in a separate thread
+threading.Thread(target=receive_messages, daemon=True).start()
+
+
+# Function to create a room
+def create_room():
+    message = {"action": "create_room"}
+    client_socket.send(json.dumps(message).encode("utf-8"))
+
+
+# Function to join a room
+def join_room(room_id):
+    message = {"action": "join_room", "room_id": room_id}
+    client_socket.send(json.dumps(message).encode("utf-8"))
+
+
+# Function to send a chat message
+def send_chat_message(text, sender="Player"):
+    message = {"action": "send_message", "text": text, "sender": sender}
+    client_socket.send(json.dumps(message).encode("utf-8"))
+
+
+# Function to send player data to the server
+def send_data():
+    while True:
+        try:
+            if current_room_id:
+                player_data_message = {
+                    "action": "update_player_data",
+                    "room_id": current_room_id,
+                    "player_data": player_data
+                }
+                client_socket.send(json.dumps(player_data_message).encode("utf-8"))
         except:
             break
 
-# Start threads to handle network communication
-threading.Thread(target=send_data, daemon=True).start()
-threading.Thread(target=receive_data, daemon=True).start()
 
+# Start sending player data in a separate thread
+threading.Thread(target=send_data, daemon=True).start()
+
+
+# Game logic for player movement
 def handle_player_movement(keys_pressed):
     global player_data
 
@@ -103,17 +154,6 @@ def handle_player_movement(keys_pressed):
         player_data["x"] += dash_direction * dash_speed
         player_data["dash_timer"] = dash_cooldown
 
-    # Slash attack
-    if keys_pressed[pygame.K_f] and not player_data["is_slashing"]:
-        player_data["is_slashing"] = True
-        player_data["slash_timer"] = 10
-
-    # Handle slash timer countdown
-    if player_data["is_slashing"]:
-        player_data["slash_timer"] -= 1
-        if player_data["slash_timer"] <= 0:
-            player_data["is_slashing"] = False
-
     # Gravity and vertical movement
     player_data["velocity"] += gravity
     player_data["y"] += player_data["velocity"]
@@ -130,13 +170,17 @@ def handle_player_movement(keys_pressed):
     if player_data["dash_timer"] > 0:
         player_data["dash_timer"] -= 1
 
+
+# Draw platforms, local player, and health bar
 def draw_platforms():
     for platform in platforms:
         pygame.draw.rect(screen, GREEN, platform)
 
+
 def draw_health_bar():
     pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
     pygame.draw.rect(screen, BLUE, (12, 12, player_data["health"], 20))
+
 
 # Main game loop
 running = True
