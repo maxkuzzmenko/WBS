@@ -6,9 +6,24 @@ from random import randint
 # Server Configuration
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 5555
-rooms = {}  # Format: { room_id: {"players": [conn1, conn2, ...], "max_players": 5} }
+rooms = {}  # Format: { room_id: {"players": {conn: player_data}, "max_players": 5} }
 lock = threading.Lock()
 
+def broadcast_positions():
+    while True:
+        with lock:
+            for room_id, room_data in rooms.items():
+                players_data = {str(conn.getpeername()): data for conn, data in room_data["players"].items()}
+                message = {"status": "update_players", "players": players_data}
+                for conn in room_data["players"]:
+                    try:
+                        conn.send((json.dumps(message) + "\n").encode("utf-8"))
+                    except Exception as e:
+                        print(f"Error broadcasting to {conn}: {e}")
+
+# Start broadcasting positions in a separate thread
+broadcast_thread = threading.Thread(target=broadcast_positions, daemon=True)
+broadcast_thread.start()
 
 def handle_client(conn, addr):
     current_room_id = None
@@ -44,27 +59,23 @@ def handle_client(conn, addr):
                     print(f"Generated room ID: {room_id}")
 
                     # Attempt to acquire lock and add room to rooms dictionary
-                    try:
-                        with lock:
-                            rooms[room_id] = {"players": [conn], "max_players": 5}
-                            print(f"Room {room_id} created. Current rooms: {rooms}")
+                    with lock:
+                        rooms[room_id] = {"players": {conn: {"x": 100, "y": 500}}, "max_players": 5}
+                        print(f"Room {room_id} created. Current rooms: {rooms}")
 
-                        current_room_id = room_id
-                        response = json.dumps({"status": "room_created", "room_id": room_id}) + "\n"
-                        print(f"Preparing response for client {addr}")
+                    current_room_id = room_id
+                    response = json.dumps({"status": "room_created", "room_id": room_id}) + "\n"
+                    print(f"Preparing response for client {addr}")
 
-                        # Step 4: Attempt to send the response back to the client
-                        conn.send(response.encode("utf-8"))
-                        print("Room creation response sent to client.")
-
-                    except Exception as e:
-                        print(f"Failed during room creation or sending response: {e}")
+                    # Step 4: Attempt to send the response back to the client
+                    conn.send(response.encode("utf-8"))
+                    print("Room creation response sent to client.")
 
                 elif action == "join_room":
                     room_id = str(message.get("room_id"))  # Convert to string for consistency
                     with lock:
                         if room_id in rooms and len(rooms[room_id]["players"]) < rooms[room_id]["max_players"]:
-                            rooms[room_id]["players"].append(conn)
+                            rooms[room_id]["players"][conn] = {"x": 100, "y": 500}
                             current_room_id = room_id
                             conn.send(
                                 (json.dumps({"status": "joined_room", "room_id": room_id}) + "\n").encode("utf-8"))
@@ -77,6 +88,13 @@ def handle_client(conn, addr):
                             conn.send((json.dumps(
                                 {"status": "error", "message": "Room full or doesn't exist"}) + "\n").encode("utf-8"))
 
+                elif action == "update_player_data" and current_room_id:
+                    # Store player position updates
+                    with lock:
+                        if current_room_id in rooms and conn in rooms[current_room_id]["players"]:
+                            rooms[current_room_id]["players"][conn] = message["player_data"]
+                            print(f"Updated player data for {addr} in room {current_room_id}: {message['player_data']}")
+
     except Exception as e:
         print(f"Error with client {addr}: {e}")
 
@@ -85,7 +103,8 @@ def handle_client(conn, addr):
         if current_room_id:
             with lock:
                 if current_room_id in rooms:
-                    rooms[current_room_id]["players"].remove(conn)
+                    if conn in rooms[current_room_id]["players"]:
+                        del rooms[current_room_id]["players"][conn]
                     if not rooms[current_room_id]["players"]:  # If room is empty, delete it
                         del rooms[current_room_id]
                     else:
@@ -105,6 +124,5 @@ def start_server():
         conn, addr = server.accept()
         print(f"New connection: {addr}")
         threading.Thread(target=handle_client, args=(conn, addr)).start()
-
 
 start_server()
