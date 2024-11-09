@@ -4,16 +4,16 @@ import json
 import pygame
 import sys
 
-# Server IP and Port (Use your server's public IP address and port here)
+# Server IP and Port (Replace with your server’s ngrok URL and port)
 SERVER_IP = "0.tcp.eu.ngrok.io"
 SERVER_PORT = 11094
 
 # Initialize pygame
 pygame.init()
 
-# Constants
+# Screen Constants
 WIDTH, HEIGHT = 800, 600
-FPS = 75
+FPS = 60
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
@@ -22,37 +22,29 @@ BLACK = (0, 0, 0)
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Platformer Game with Network Multiplayer and Chat")
+pygame.display.set_caption("Multiplayer Platformer")
 clock = pygame.time.Clock()
 
 # Player properties
 player_size = (50, 50)
+player_speed = 5
 gravity = 1
 jump_height = -15
 dash_speed = 15
-dash_cooldown = 30
-player_speed = 5
 
 # Initial player data for this client
 player_data = {
     "x": 100,
     "y": 500,
-    "health": 100,
     "color": "BLUE",
     "velocity": 0,
     "on_ground": False,
     "double_jump_allowed": True,
-    "dash_timer": 0,
-    "is_slashing": False,
-    "slash_timer": 0
 }
-other_players = {}
-current_room_id = None
+other_players = {}  # Other players' data
+current_room_id = None  # Room ID for this player
 
-# Platform properties
-platforms = [pygame.Rect(0, 550, 800, 10)]
-
-# Connect to the server
+# Socket setup
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((SERVER_IP, SERVER_PORT))
 
@@ -66,7 +58,7 @@ def receive_messages():
             if data:
                 message = json.loads(data)
 
-                # Handle different types of messages from the server
+                # Handle different message types
                 if message["status"] == "new_message":
                     print(f"{message['sender']}: {message['text']}")
                 elif message["status"] == "player_joined":
@@ -103,12 +95,6 @@ def join_room(room_id):
     client_socket.send(json.dumps(message).encode("utf-8"))
 
 
-# Function to send a chat message
-def send_chat_message(text, sender="Player"):
-    message = {"action": "send_message", "text": text, "sender": sender}
-    client_socket.send(json.dumps(message).encode("utf-8"))
-
-
 # Function to send player data to the server
 def send_data():
     while True:
@@ -128,18 +114,68 @@ def send_data():
 threading.Thread(target=send_data, daemon=True).start()
 
 
-# Game logic for player movement
+# Display the main menu for room creation and joining
+def main_menu():
+    menu_font = pygame.font.Font(None, 36)
+    input_box = pygame.Rect(300, 250, 200, 50)
+    color_inactive = pygame.Color('lightskyblue3')
+    color_active = pygame.Color('dodgerblue2')
+    color = color_inactive
+    active = False
+    text = ""
+    menu_message = "Enter 'create' to create a room or Room ID to join"
+
+    while True:
+        screen.fill(WHITE)
+        menu_text = menu_font.render(menu_message, True, BLACK)
+        screen.blit(menu_text, (150, 150))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Toggle the input box
+                if input_box.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_inactive
+            elif event.type == pygame.KEYDOWN:
+                if active:
+                    if event.key == pygame.K_RETURN:
+                        if text.lower() == "create":
+                            create_room()
+                        else:
+                            join_room(text)
+                        text = ""
+                    elif event.key == pygame.K_BACKSPACE:
+                        text = text[:-1]
+                    else:
+                        text += event.unicode
+
+        txt_surface = menu_font.render(text, True, color)
+        width = max(200, txt_surface.get_width() + 10)
+        input_box.w = width
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(screen, color, input_box, 2)
+
+        pygame.display.flip()
+        clock.tick(30)
+
+        # Exit the menu once we've joined or created a room
+        if current_room_id:
+            break
+
+
+# Player movement
 def handle_player_movement(keys_pressed):
     global player_data
-
-    # Horizontal movement
-    if keys_pressed[pygame.K_a]:  # Left
+    if keys_pressed[pygame.K_a]:  # Move left
         player_data["x"] -= player_speed
-    if keys_pressed[pygame.K_d]:  # Right
+    if keys_pressed[pygame.K_d]:  # Move right
         player_data["x"] += player_speed
-
-    # Jump and double jump
-    if keys_pressed[pygame.K_w]:
+    if keys_pressed[pygame.K_w]:  # Jump
         if player_data["on_ground"]:
             player_data["velocity"] = jump_height
             player_data["on_ground"] = False
@@ -147,68 +183,46 @@ def handle_player_movement(keys_pressed):
         elif player_data["double_jump_allowed"]:
             player_data["velocity"] = jump_height
             player_data["double_jump_allowed"] = False
-
-    # Dash
-    if keys_pressed[pygame.K_LSHIFT] and player_data["dash_timer"] == 0:
-        dash_direction = player_speed if keys_pressed[pygame.K_d] else -player_speed
-        player_data["x"] += dash_direction * dash_speed
-        player_data["dash_timer"] = dash_cooldown
-
-    # Gravity and vertical movement
     player_data["velocity"] += gravity
     player_data["y"] += player_data["velocity"]
 
-    # Collision detection with platforms
-    player_rect = pygame.Rect(player_data["x"], player_data["y"], *player_size)
-    for platform in platforms:
-        if player_rect.colliderect(platform) and player_data["velocity"] > 0:
-            player_data["y"] = platform.top - player_size[1]
-            player_data["velocity"] = 0
-            player_data["on_ground"] = True
-
-    # Dash cooldown
-    if player_data["dash_timer"] > 0:
-        player_data["dash_timer"] -= 1
+    # Ground collision
+    if player_data["y"] > 500:
+        player_data["y"] = 500
+        player_data["on_ground"] = True
+        player_data["velocity"] = 0
 
 
-# Draw platforms, local player, and health bar
-def draw_platforms():
-    for platform in platforms:
-        pygame.draw.rect(screen, GREEN, platform)
-
-
-def draw_health_bar():
-    pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
-    pygame.draw.rect(screen, BLUE, (12, 12, player_data["health"], 20))
-
-
-# Main game loop
-running = True
-while running:
-    clock.tick(FPS)
-    screen.fill(WHITE)
-
-    # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    # Player movement and interactions
-    keys_pressed = pygame.key.get_pressed()
-    handle_player_movement(keys_pressed)
-
-    # Draw platforms, local player, and health bar
-    draw_platforms()
+# Draw all players on the screen
+def draw_players():
     pygame.draw.rect(screen, BLUE, (player_data["x"], player_data["y"], *player_size))
-    draw_health_bar()
-
-    # Draw other players
     for pid, pdata in other_players.items():
         if pid != str(client_socket.getsockname()[1]):  # Don't draw self
             color = RED if pdata["color"] == "RED" else BLUE
             pygame.draw.rect(screen, color, (pdata["x"], pdata["y"], *player_size))
 
-    pygame.display.flip()
 
-pygame.quit()
-client_socket.close()
+# Game Loop
+def game_loop():
+    while True:
+        screen.fill(WHITE)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Get player input
+        keys_pressed = pygame.key.get_pressed()
+        handle_player_movement(keys_pressed)
+
+        # Draw elements on the screen
+        draw_players()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+# Main Program Flow
+main_menu()
+game_loop()
