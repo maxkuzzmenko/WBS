@@ -5,8 +5,8 @@ import pygame
 import sys
 
 # Server IP and Port (Replace with your server’s ngrok URL and port)
-SERVER_IP = "0.tcp.eu.ngrok.io"
-SERVER_PORT = 11094
+SERVER_IP = "127.0.0.1"
+SERVER_PORT = 5555
 
 # Initialize pygame
 pygame.init()
@@ -86,7 +86,8 @@ threading.Thread(target=receive_messages, daemon=True).start()
 # Function to create a room
 def create_room():
     message = {"action": "create_room"}
-    client_socket.send(json.dumps(message).encode("utf-8"))
+    client_socket.send((json.dumps(message) + "\n").encode("utf-8"))  # Send message with newline
+    print("Sent create_room request to server.")
 
 
 # Function to join a room

@@ -1,7 +1,7 @@
 import socket
 import threading
 import json
-import random
+from random import randint
 
 # Server Configuration
 SERVER_IP = "0.0.0.0"
@@ -9,67 +9,73 @@ SERVER_PORT = 5555
 rooms = {}  # Format: { room_id: {"players": [conn1, conn2, ...], "max_players": 5} }
 lock = threading.Lock()
 
-# Handle each client connection
 
-
-# Handle each client connection
 def handle_client(conn, addr):
     current_room_id = None
-    buffer = ""  # Buffer to accumulate incoming data
+    buffer = ""
     try:
         while True:
-            # Receive message from client
+            # Step 1: Receive data from client
             data = conn.recv(1024).decode("utf-8")
             if not data:
                 break
-
-            # Accumulate data in buffer
             buffer += data
+            print(f"Data received from {addr}: {data}")
 
-            # Process each complete JSON object (split by newline)
+            # Step 2: Process each complete JSON message separated by newline
             while "\n" in buffer:
-                message_str, buffer = buffer.split("\n", 1)  # Split at first newline
+                message_str, buffer = buffer.split("\n", 1)
                 try:
                     message = json.loads(message_str)
+                    print(f"Parsed message from {addr}: {message}")
                 except json.JSONDecodeError:
                     print("Received malformed JSON, skipping...")
                     continue
 
+                # Step 3: Process 'create_room' action
                 action = message.get("action")
+                print(f"Action received: {action}")
 
                 if action == "create_room":
-                    # Generate a unique room ID and create a new room
-                    room_id = str(random.randint(1000, 9999))
-                    with lock:
-                        rooms[room_id] = {"players": [conn], "max_players": 5}
-                    current_room_id = room_id
-                    conn.send((json.dumps({"status": "room_created", "room_id": room_id}) + "\n").encode("utf-8"))
+                    print("Starting to create room...")
+
+                    # Directly generate a room ID here
+                    room_id = str(randint(1000, 9999))
+                    print(f"Generated room ID: {room_id}")
+
+                    # Attempt to acquire lock and add room to rooms dictionary
+                    try:
+                        with lock:
+                            rooms[room_id] = {"players": [conn], "max_players": 5}
+                            print(f"Room {room_id} created. Current rooms: {rooms}")
+
+                        current_room_id = room_id
+                        response = json.dumps({"status": "room_created", "room_id": room_id}) + "\n"
+                        print(f"Preparing response for client {addr}")
+
+                        # Step 4: Attempt to send the response back to the client
+                        conn.send(response.encode("utf-8"))
+                        print("Room creation response sent to client.")
+
+                    except Exception as e:
+                        print(f"Failed during room creation or sending response: {e}")
 
                 elif action == "join_room":
-                    room_id = message.get("room_id")
+                    room_id = str(message.get("room_id"))  # Convert to string for consistency
                     with lock:
                         if room_id in rooms and len(rooms[room_id]["players"]) < rooms[room_id]["max_players"]:
                             rooms[room_id]["players"].append(conn)
                             current_room_id = room_id
                             conn.send(
                                 (json.dumps({"status": "joined_room", "room_id": room_id}) + "\n").encode("utf-8"))
-                            # Notify all players in the room of the new player
+                            # Notify other players in the room
                             for player_conn in rooms[room_id]["players"]:
                                 if player_conn != conn:
                                     player_conn.send((json.dumps({"status": "player_joined"}) + "\n").encode("utf-8"))
+                            print(f"Client {addr} joined room {room_id}")
                         else:
                             conn.send((json.dumps(
                                 {"status": "error", "message": "Room full or doesn't exist"}) + "\n").encode("utf-8"))
-
-                elif action == "send_message":
-                    if current_room_id:
-                        chat_message = message.get("text")
-                        sender = message.get("sender")
-                        with lock:
-                            for player_conn in rooms[current_room_id]["players"]:
-                                player_conn.send((json.dumps(
-                                    {"status": "new_message", "sender": sender, "text": chat_message}) + "\n").encode(
-                                    "utf-8"))
 
     except Exception as e:
         print(f"Error with client {addr}: {e}")
@@ -78,14 +84,17 @@ def handle_client(conn, addr):
         # Clean up on disconnect
         if current_room_id:
             with lock:
-                rooms[current_room_id]["players"].remove(conn)
-                if not rooms[current_room_id]["players"]:
-                    del rooms[current_room_id]
-                else:
-                    for player_conn in rooms[current_room_id]["players"]:
-                        player_conn.send((json.dumps({"status": "player_left"}) + "\n").encode("utf-8"))
+                if current_room_id in rooms:
+                    rooms[current_room_id]["players"].remove(conn)
+                    if not rooms[current_room_id]["players"]:  # If room is empty, delete it
+                        del rooms[current_room_id]
+                    else:
+                        for player_conn in rooms[current_room_id]["players"]:
+                            player_conn.send((json.dumps({"status": "player_left"}) + "\n").encode("utf-8"))
         conn.close()
-# Start the server
+        print(f"Client {addr} disconnected")
+
+
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((SERVER_IP, SERVER_PORT))

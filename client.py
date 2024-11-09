@@ -3,8 +3,8 @@ import threading
 import json
 
 # Server connection configuration
-SERVER_IP = "127.0.0.1"  # Change this to your server IP
-SERVER_PORT = 5555
+SERVER_IP = "0.tcp.eu.ngrok.io"  # Change this to your server IP
+SERVER_PORT = 11094
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((SERVER_IP, SERVER_PORT))
@@ -45,7 +45,6 @@ def join_room(room_id):
 def send_chat_message(text, sender="Player"):
     message = {"action": "send_message", "text": text, "sender": sender}
     client_socket.send(json.dumps(message).encode("utf-8"))
-
 # Main loop for user commands
 while True:
     command = input("Enter a command ('create', 'join <room_id>', 'say <message>'): ")
