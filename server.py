@@ -36,41 +36,41 @@ def handle_client(conn, addr):
             if not data:
                 break
             buffer += data
-            print(f"Data received from {addr}: {data}")
+#            print(f"Data received from {addr}: {data}")
 
             # Step 2: Process each complete JSON message separated by newline
             while "\n" in buffer:
                 message_str, buffer = buffer.split("\n", 1)
                 try:
                     message = json.loads(message_str)
-                    print(f"Parsed message from {addr}: {message}")
+#                    print(f"Parsed message from {addr}: {message}")
                 except json.JSONDecodeError:
-                    print("Received malformed JSON, skipping...")
+#                    print("Received malformed JSON, skipping...")
                     continue
 
                 # Step 3: Process 'create_room' action
                 action = message.get("action")
-                print(f"Action received: {action}")
+#                print(f"Action received: {action}")
 
                 if action == "create_room":
-                    print("Starting to create room...")
+#                    print("Starting to create room...")
 
                     # Directly generate a room ID here
                     room_id = str(randint(1000, 9999))
-                    print(f"Generated room ID: {room_id}")
+#                    print(f"Generated room ID: {room_id}")
 
                     # Attempt to acquire lock and add room to rooms dictionary
                     with lock:
                         rooms[room_id] = {"players": {}, "max_players": 5, "player_count": 0}
-                        print(f"Room {room_id} created. Current rooms: {rooms}")
+#                        print(f"Room {room_id} created. Current rooms: {rooms}")
 
                     current_room_id = room_id
                     response = json.dumps({"status": "room_created", "room_id": room_id}) + "\n"
-                    print(f"Preparing response for client {addr}")
+#                    print(f"Preparing response for client {addr}")
 
                     # Step 4: Attempt to send the response back to the client
                     conn.send(response.encode("utf-8"))
-                    print("Room creation response sent to client.")
+#                    print("Room creation response sent to client.")
 
                 elif action == "join_room":
                     room_id = str(message.get("room_id"))  # Convert to string for consistency
