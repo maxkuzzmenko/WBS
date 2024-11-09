@@ -5,8 +5,8 @@ import pygame
 import sys
 
 # Server IP and Port (Replace with your server’s ngrok URL and port)
-SERVER_IP = "127.0.0.1"
-SERVER_PORT = 5555
+SERVER_IP = "0.tcp.eu.ngrok.io"
+SERVER_PORT = 11094
 
 # Initialize pygame
 pygame.init()
@@ -30,7 +30,6 @@ player_size = (50, 50)
 player_speed = 5
 gravity = 1
 jump_height = -15
-dash_speed = 15
 
 # Initial player data for this client
 player_data = {
@@ -73,7 +72,9 @@ def receive_messages():
                     current_room_id = message["room_id"]
                     print(f"Joined room: {current_room_id}")
                 elif message["status"] == "update_players":
+                    # Update `other_players` with the received players' positions
                     other_players = message["players"]
+                    print("Updated player positions:", other_players)  # Debug print
         except Exception as e:
             print("Connection error:", e)
             break
@@ -93,7 +94,8 @@ def create_room():
 # Function to join a room
 def join_room(room_id):
     message = {"action": "join_room", "room_id": room_id}
-    client_socket.send(json.dumps(message).encode("utf-8"))
+    client_socket.send((json.dumps(message) + "\n").encode("utf-8"))  # Send message with newline
+    print("Sent join_room request to server.")
 
 
 # Function to send player data to the server
@@ -106,8 +108,9 @@ def send_data():
                     "room_id": current_room_id,
                     "player_data": player_data
                 }
-                client_socket.send(json.dumps(player_data_message).encode("utf-8"))
-        except:
+                client_socket.send((json.dumps(player_data_message) + "\n").encode("utf-8"))
+        except Exception as e:
+            print("Error sending data:", e)
             break
 
 
@@ -196,9 +199,12 @@ def handle_player_movement(keys_pressed):
 
 # Draw all players on the screen
 def draw_players():
+    # Draw this client's player
     pygame.draw.rect(screen, BLUE, (player_data["x"], player_data["y"], *player_size))
-    for pid, pdata in other_players.items():
-        if pid != str(client_socket.getsockname()[1]):  # Don't draw self
+
+    # Draw other players
+    for player_id, pdata in other_players.items():
+        if player_id != str(client_socket.getsockname()[1]):  # Avoid drawing this client twice
             color = RED if pdata["color"] == "RED" else BLUE
             pygame.draw.rect(screen, color, (pdata["x"], pdata["y"], *player_size))
 
