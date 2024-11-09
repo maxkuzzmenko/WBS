@@ -2,18 +2,16 @@ import socket
 import threading
 import json
 
-# Server configuration
-SERVER_IP = "127.0.0.1"  # Replace with public IP for global access
+# Server Configuration
+SERVER_IP = "0.0.0.0"  # Use "0.0.0.0" to listen on all network interfaces
 SERVER_PORT = 5555
 clients = {}
 lock = threading.Lock()
 
-# Handle incoming messages from clients
+# Function to handle individual client connections
 def handle_client(conn, addr):
-    global clients
-    print(f"[NEW CONNECTION] {addr} connected.")
     player_id = addr[1]
-    clients[player_id] = {"x": 100, "y": 500, "health": 100}
+    clients[player_id] = {"x": 100, "y": 500, "health": 100}  # Initial player state
 
     try:
         while True:
@@ -21,37 +19,37 @@ def handle_client(conn, addr):
             if not data:
                 break
 
+            # Decode and update the player's data
             player_data = json.loads(data)
             with lock:
                 clients[player_id] = player_data
 
-            # Broadcast updated player states to all clients
+            # Broadcast the updated state to all clients
             broadcast_data = json.dumps(clients)
             for client_conn in list(clients.keys()):
-                try:
-                    conn.send(broadcast_data.encode("utf-8"))
-                except:
-                    del clients[client_conn]
-    except Exception as e:
-        print(f"[ERROR] {e}")
-
-    # Handle disconnection
-    print(f"[DISCONNECT] {addr} disconnected.")
-    with lock:
-        del clients[player_id]
-    conn.close()
+                if client_conn != player_id:  # Avoid sending data to the sender
+                    try:
+                        conn.send(broadcast_data.encode("utf-8"))
+                    except:
+                        del clients[client_conn]
+    except:
+        pass
+    finally:
+        # Disconnect client
+        with lock:
+            del clients[player_id]
+        conn.close()
 
 # Start the server
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((SERVER_IP, SERVER_PORT))
     server.listen()
-    print(f"[LISTENING] Server is listening on {SERVER_IP}:{SERVER_PORT}")
+    print(f"[SERVER] Listening on {SERVER_IP}:{SERVER_PORT}")
 
     while True:
         conn, addr = server.accept()
-        thread = threading.Thread(target=handle_client, args=(conn, addr))
-        thread.start()
-        print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
+        print(f"[NEW CONNECTION] {addr} connected.")
+        threading.Thread(target=handle_client, args=(conn, addr)).start()
 
 start_server()
