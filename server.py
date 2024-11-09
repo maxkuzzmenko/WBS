@@ -6,14 +6,15 @@ from random import randint
 # Server Configuration
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 5555
-rooms = {}  # Format: { room_id: {"players": {conn: player_data}, "max_players": 5} }
+rooms = {}  # Format: { room_id: {"players": {conn: player_data}, "max_players": 5, "player_count": 0} }
 lock = threading.Lock()
 
 def broadcast_positions():
     while True:
         with lock:
             for room_id, room_data in rooms.items():
-                players_data = {str(conn.getpeername()): data for conn, data in room_data["players"].items()}
+                # Gather each player's position and label in the room
+                players_data = {data["label"]: {"x": data["x"], "y": data["y"]} for data in room_data["players"].values()}
                 message = {"status": "update_players", "players": players_data}
                 for conn in room_data["players"]:
                     try:
@@ -60,7 +61,7 @@ def handle_client(conn, addr):
 
                     # Attempt to acquire lock and add room to rooms dictionary
                     with lock:
-                        rooms[room_id] = {"players": {conn: {"x": 100, "y": 500}}, "max_players": 5}
+                        rooms[room_id] = {"players": {}, "max_players": 5, "player_count": 0}
                         print(f"Room {room_id} created. Current rooms: {rooms}")
 
                     current_room_id = room_id
@@ -75,15 +76,23 @@ def handle_client(conn, addr):
                     room_id = str(message.get("room_id"))  # Convert to string for consistency
                     with lock:
                         if room_id in rooms and len(rooms[room_id]["players"]) < rooms[room_id]["max_players"]:
-                            rooms[room_id]["players"][conn] = {"x": 100, "y": 500}
+                            # Increment player count for unique player label
+                            rooms[room_id]["player_count"] += 1
+                            player_label = f"Player {rooms[room_id]['player_count']}"
+
+                            # Add player to the room with default position and unique label
+                            rooms[room_id]["players"][conn] = {"label": player_label, "x": 100, "y": 500}
                             current_room_id = room_id
+
+                            # Send joined_room response with player label to client
                             conn.send(
-                                (json.dumps({"status": "joined_room", "room_id": room_id}) + "\n").encode("utf-8"))
+                                (json.dumps({"status": "joined_room", "room_id": room_id, "label": player_label}) + "\n").encode("utf-8"))
+
                             # Notify other players in the room
                             for player_conn in rooms[room_id]["players"]:
                                 if player_conn != conn:
-                                    player_conn.send((json.dumps({"status": "player_joined"}) + "\n").encode("utf-8"))
-                            print(f"Client {addr} joined room {room_id}")
+                                    player_conn.send((json.dumps({"status": "player_joined", "label": player_label}) + "\n").encode("utf-8"))
+                            print(f"{player_label} ({addr}) joined room {room_id}")
                         else:
                             conn.send((json.dumps(
                                 {"status": "error", "message": "Room full or doesn't exist"}) + "\n").encode("utf-8"))
@@ -92,7 +101,8 @@ def handle_client(conn, addr):
                     # Store player position updates
                     with lock:
                         if current_room_id in rooms and conn in rooms[current_room_id]["players"]:
-                            rooms[current_room_id]["players"][conn] = message["player_data"]
+                            rooms[current_room_id]["players"][conn]["x"] = message["player_data"]["x"]
+                            rooms[current_room_id]["players"][conn]["y"] = message["player_data"]["y"]
                             print(f"Updated player data for {addr} in room {current_room_id}: {message['player_data']}")
 
     except Exception as e:
@@ -104,12 +114,13 @@ def handle_client(conn, addr):
             with lock:
                 if current_room_id in rooms:
                     if conn in rooms[current_room_id]["players"]:
+                        player_label = rooms[current_room_id]["players"][conn]["label"]
                         del rooms[current_room_id]["players"][conn]
                     if not rooms[current_room_id]["players"]:  # If room is empty, delete it
                         del rooms[current_room_id]
                     else:
                         for player_conn in rooms[current_room_id]["players"]:
-                            player_conn.send((json.dumps({"status": "player_left"}) + "\n").encode("utf-8"))
+                            player_conn.send((json.dumps({"status": "player_left", "label": player_label}) + "\n").encode("utf-8"))
         conn.close()
         print(f"Client {addr} disconnected")
 
