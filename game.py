@@ -44,7 +44,8 @@ players = [
             "right": pygame.K_d,
             "jump": pygame.K_w,
             "dash": pygame.K_LSHIFT,
-            "slash": pygame.K_f
+            "slash": pygame.K_f,
+            "down":pygame.K_s
         }
     },
     {  # Player 2
@@ -63,7 +64,8 @@ players = [
             "right": pygame.K_RIGHT,
             "jump": pygame.K_UP,
             "dash": pygame.K_RSHIFT,
-            "slash": pygame.K_RETURN
+            "slash": pygame.K_RETURN,
+            "down":pygame.K_DOWN
         }
     }
 ]
