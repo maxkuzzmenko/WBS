@@ -51,11 +51,23 @@ client_socket.connect((SERVER_IP, SERVER_PORT))
 # Function to receive messages from the server
 def receive_messages():
     global other_players
+    buffer = ""
     while True:
         try:
             data = client_socket.recv(1024).decode("utf-8")
-            if data:
-                message = json.loads(data)
+            if not data:
+                break
+
+            buffer += data  # Add new data to buffer
+
+            # Process each complete JSON message
+            while "\n" in buffer:
+                message_str, buffer = buffer.split("\n", 1)  # Split at first newline
+                try:
+                    message = json.loads(message_str)
+                except json.JSONDecodeError:
+                    print("Received malformed JSON, skipping...")
+                    continue
 
                 # Handle different message types
                 if message["status"] == "new_message":
@@ -78,6 +90,7 @@ def receive_messages():
         except Exception as e:
             print("Connection error:", e)
             break
+
 
 
 # Start receiving messages in a separate thread
