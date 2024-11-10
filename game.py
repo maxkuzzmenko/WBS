@@ -5,7 +5,7 @@ import pygame
 import sys
 
 # Server IP and Port (Replace with your server’s ngrok URL and port)
-SERVER_IP = "192.168.1.151"
+SERVER_IP = "192.168.1.236"
 SERVER_PORT = 5555
 
 # Initialize pygame
