@@ -5,7 +5,7 @@ import pygame
 import sys
 
 # Server IP and Port (Replace with your server’s ngrok URL and port)
-SERVER_IP = "192.168.1.129"
+SERVER_IP = "192.168.1.151"
 SERVER_PORT = 5555
 
 # Initialize pygame
@@ -49,6 +49,7 @@ client_socket.connect((SERVER_IP, SERVER_PORT))
 
 
 # Function to receive messages from the server
+# Function to receive messages from the server
 def receive_messages():
     global other_players
     buffer = ""
@@ -70,26 +71,44 @@ def receive_messages():
                     continue
 
                 # Handle different message types
-                if message["status"] == "new_message":
-                    print(f"{message['sender']}: {message['text']}")
-                elif message["status"] == "player_joined":
-                    print("A new player has joined the room.")
-                elif message["status"] == "player_left":
-                    print("A player has left the room.")
-                elif message["status"] == "room_created":
+                if message["status"] == "room_created":
                     global current_room_id
                     current_room_id = message["room_id"]
                     print(f"Room created. Room ID: {current_room_id}")
                 elif message["status"] == "joined_room":
                     current_room_id = message["room_id"]
-                    print(f"Joined room: {current_room_id}")
-                elif message["status"] == "update_players":
-                    # Update `other_players` with the received players' positions
-                    other_players = message["players"]
-                    print("Updated player positions:", other_players)  # Debug print
+                    player_data["color"] = message["color"]
+                    print(f"Joined room: {current_room_id} as {message['label']}")
+                elif message["status"] == "player_joined":
+                    other_players[message["label"]] = {
+                        "x": message["x"],
+                        "y": message["y"],
+                        "color": message["color"]
+                    }
+                    print(f"A new player ({message['label']}) has joined the room.")
+                elif message["status"] == "update_player_position":
+                    if message["label"] in other_players:
+                        other_players[message["label"]]["x"] = message["x"]
+                        other_players[message["label"]]["y"] = message["y"]
+                elif message["status"] == "player_left":
+                    if message["label"] in other_players:
+                        del other_players[message["label"]]
+                        print(f"A player ({message['label']}) has left the room.")
         except Exception as e:
             print("Connection error:", e)
             break
+
+
+# Draw all players on the screen
+def draw_players():
+    # Draw this client's player
+    color = RED if player_data["color"] == "RED" else BLUE
+    pygame.draw.rect(screen, color, (player_data["x"], player_data["y"], *player_size))
+
+    # Draw other players
+    for player_id, pdata in other_players.items():
+        player_color = RED if pdata["color"] == "RED" else BLUE
+        pygame.draw.rect(screen, player_color, (pdata["x"], pdata["y"], *player_size))
 
 
 

@@ -51,19 +51,28 @@ def handle_client(conn, addr):
                         if room_id in rooms and len(rooms[room_id]["players"]) < rooms[room_id]["max_players"]:
                             rooms[room_id]["player_count"] += 1
                             player_label = f"Player {rooms[room_id]['player_count']}"
+                            player_color = "RED" if rooms[room_id]['player_count'] % 2 == 0 else "BLUE"
                             print(f"Assigning {player_label} to client {addr}")
 
-                            rooms[room_id]["players"][conn] = {"label": player_label, "x": 100, "y": 500}
+                            rooms[room_id]["players"][conn] = {
+                                "label": player_label, "x": 100, "y": 500, "color": player_color
+                            }
                             current_room_id = room_id
                             conn.send(
-                                (json.dumps({"status": "joined_room", "room_id": room_id, "label": player_label}) + "\n").encode("utf-8"))
+                                (json.dumps({"status": "joined_room", "room_id": room_id, "label": player_label, "color": player_color}) + "\n").encode("utf-8"))
                             print(f"{player_label} ({addr}) joined room {room_id}")
 
-                            # Notify other players in the room about the new player
+                            # Notify all players in the room about the new player
                             for player_conn in rooms[room_id]["players"]:
                                 if player_conn != conn:
                                     try:
-                                        player_conn.send((json.dumps({"status": "player_joined", "label": player_label}) + "\n").encode("utf-8"))
+                                        player_conn.send((json.dumps({
+                                            "status": "player_joined",
+                                            "label": player_label,
+                                            "color": player_color,
+                                            "x": 100,
+                                            "y": 500
+                                        }) + "\n").encode("utf-8"))
                                     except Exception as e:
                                         print(f"Error notifying player about new player: {e}")
 
@@ -77,7 +86,19 @@ def handle_client(conn, addr):
                         if current_room_id in rooms and conn in rooms[current_room_id]["players"]:
                             rooms[current_room_id]["players"][conn]["x"] = message["player_data"]["x"]
                             rooms[current_room_id]["players"][conn]["y"] = message["player_data"]["y"]
-                            print(f"Updated player data for {addr} in room {current_room_id}: {message['player_data']}")
+
+                            # Notify other players about updated player positions
+                            for player_conn in rooms[current_room_id]["players"]:
+                                if player_conn != conn:
+                                    try:
+                                        player_conn.send((json.dumps({
+                                            "status": "update_player_position",
+                                            "label": rooms[current_room_id]["players"][conn]["label"],
+                                            "x": message["player_data"]["x"],
+                                            "y": message["player_data"]["y"]
+                                        }) + "\n").encode("utf-8"))
+                                    except Exception as e:
+                                        print(f"Error updating player position: {e}")
 
     except Exception as e:
         print(f"Error with client {addr}: {e}")
