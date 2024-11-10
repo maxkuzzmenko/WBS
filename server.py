@@ -49,8 +49,14 @@ def handle_client(conn, addr):
                         "label": player_label, "x": 100, "y": 500, "color": player_color
                     }
 
-                    # Send room creation response
-                    response = json.dumps({"status": "room_created", "room_id": room_id, "label": player_label, "color": player_color}) + "\n"
+                    # Send room creation response to Player 1, including their own details
+                    response = json.dumps({
+                        "status": "room_created",
+                        "room_id": room_id,
+                        "label": player_label,
+                        "color": player_color,
+                        "players": [{"label": player_label, "x": 100, "y": 500, "color": player_color}]
+                    }) + "\n"
                     conn.send(response.encode("utf-8"))
                     print(f"{player_label} ({addr}) created and joined room {room_id}")
 
