@@ -4,8 +4,8 @@ import json
 import pygame
 import sys
 
-# Server IP and Port (Replace with your server’s ngrok URL and port)
-SERVER_IP = "192.168.1.129"
+# Server IP and Port (Replace with your server’s IP)
+SERVER_IP = "192.168.1.151"
 SERVER_PORT = 5555
 
 # Initialize pygame
@@ -26,10 +26,16 @@ pygame.display.set_caption("Multiplayer Platformer")
 clock = pygame.time.Clock()
 
 # Player properties
-player_size = (50, 50)
 player_speed = 5
 gravity = 1
 jump_height = -15
+
+# Load Player Image
+player_image = pygame.image.load("Unbenannt.png")  # Load your player image here
+player_size = (50, 50)  # Original player size
+
+# Resize the image to match the desired player size
+player_image = pygame.transform.scale(player_image, player_size)
 
 # Initial player data for this client
 player_data = {
@@ -48,7 +54,6 @@ client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client_socket.connect((SERVER_IP, SERVER_PORT))
 
 
-# Function to receive messages from the server
 # Function to receive messages from the server
 def receive_messages():
     global other_players
@@ -71,14 +76,20 @@ def receive_messages():
                     continue
 
                 # Handle different message types
-                if message["status"] == "room_created":
+                if message["status"] == "new_message":
+                    print(f"{message['sender']}: {message['text']}" + "\n")
+                elif message["status"] == "player_joined":
+                    print("A new player has joined the room.")
+                elif message["status"] == "player_left":
+                    print("A player has left the room." + "\n")
+                elif message["status"] == "room_created":
                     global current_room_id
                     current_room_id = message["room_id"]
-                    print(f"Room created. Room ID: {current_room_id}")
+                    print(f"Room created. Room ID: {current_room_id}" + "\n")
                 elif message["status"] == "joined_room":
                     current_room_id = message["room_id"]
                     player_data["color"] = message["color"]
-                    print(f"Joined room: {current_room_id} as {message['label']}")
+                    print(f"Joined room: {current_room_id} as {message['label']}" + "\n")
                 elif message["status"] == "player_joined":
                     other_players[message["label"]] = {
                         "x": message["x"],
@@ -231,14 +242,17 @@ def handle_player_movement(keys_pressed):
 
 # Draw all players on the screen
 def draw_players():
-    # Draw this client's player
-    pygame.draw.rect(screen, BLUE, (player_data["x"], player_data["y"], *player_size))
+    # Draw this client's player using the player image
+    screen.blit(player_image, (player_data["x"], player_data["y"]))
 
     # Draw other players
     for player_id, pdata in other_players.items():
         if player_id != str(client_socket.getsockname()[1]):  # Avoid drawing this client twice
-            color = RED if pdata["color"] == "RED" else BLUE
-            pygame.draw.rect(screen, color, (pdata["x"], pdata["y"], *player_size))
+            # Load and draw a different image for other players
+            color = RED if pdata["color"] == "RED" else "BLUE"
+            other_player_image = pygame.image.load("player.png")  # You can load another PNG image if desired
+            other_player_image = pygame.transform.scale(other_player_image, player_size)
+            screen.blit(other_player_image, (pdata["x"], pdata["y"]))
 
 
 # Game Loop
