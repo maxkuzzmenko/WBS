@@ -1,17 +1,10 @@
-import socket
-import threading
-import json
 import pygame
 import sys
-
-# Server IP and Port (Replace with your server’s IP)
-SERVER_IP = "192.168.1.151"
-SERVER_PORT = 5555
 
 # Initialize pygame
 pygame.init()
 
-# Screen Constants
+# Constants
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 WHITE = (255, 255, 255)
@@ -22,260 +15,197 @@ BLACK = (0, 0, 0)
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Multiplayer Platformer")
+pygame.display.set_caption("Platformer Game with Double Jump and Dash")
 clock = pygame.time.Clock()
 
 # Player properties
+player_size = (50, 50)
+player_color = BLUE
+initial_player_pos = [100, 500]
+player_pos = initial_player_pos[:]
+player_velocity = 0
 player_speed = 5
+dash_speed = 15
+dash_cooldown = 30
 gravity = 1
 jump_height = -15
+double_jump_allowed = True
+dash_timer = 0
+on_ground = False
+is_slashing = False
+slash_timer = 0
+slash_duration = 10
+player_health = 100
+damage_cooldown = 30
+damage_timer = 0
 
-# Load Player Image
-player_image = pygame.image.load("Unbenannt.png")  # Load your player image here
-player_size = (50, 50)  # Original player size
+# Platform properties
+platforms = [
+    pygame.Rect(100, 550, 200, 10),
+    pygame.Rect(400, 400, 200, 10),
+    pygame.Rect(600, 300, 200, 10)
+]
 
-# Resize the image to match the desired player size
-player_image = pygame.transform.scale(player_image, player_size)
-
-# Initial player data for this client
-player_data = {
-    "x": 100,
-    "y": 500,
-    "color": "BLUE",
-    "velocity": 0,
-    "on_ground": False,
-    "double_jump_allowed": True,
-}
-other_players = {}  # Other players' data
-current_room_id = None  # Room ID for this player
-
-# Socket setup
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect((SERVER_IP, SERVER_PORT))
-
-
-# Function to receive messages from the server
-def receive_messages():
-    global other_players
-    buffer = ""
-    while True:
-        try:
-            data = client_socket.recv(1024).decode("utf-8")
-            if not data:
-                break
-
-            buffer += data  # Add new data to buffer
-
-            # Process each complete JSON message
-            while "\n" in buffer:
-                message_str, buffer = buffer.split("\n", 1)  # Split at first newline
-                try:
-                    message = json.loads(message_str)
-                except json.JSONDecodeError:
-                    print("Received malformed JSON, skipping...")
-                    continue
-
-                # Handle different message types
-                if message["status"] == "new_message":
-                    print(f"{message['sender']}: {message['text']}" + "\n")
-                elif message["status"] == "player_joined":
-                    print("A new player has joined the room.")
-                elif message["status"] == "player_left":
-                    print("A player has left the room." + "\n")
-                elif message["status"] == "room_created":
-                    global current_room_id
-                    current_room_id = message["room_id"]
-                    print(f"Room created. Room ID: {current_room_id}" + "\n")
-                elif message["status"] == "joined_room":
-                    current_room_id = message["room_id"]
-                    player_data["color"] = message["color"]
-                    print(f"Joined room: {current_room_id} as {message['label']}" + "\n")
-                elif message["status"] == "player_joined":
-                    other_players[message["label"]] = {
-                        "x": message["x"],
-                        "y": message["y"],
-                        "color": message["color"]
-                    }
-                    print(f"A new player ({message['label']}) has joined the room.")
-                elif message["status"] == "update_player_position":
-                    if message["label"] in other_players:
-                        other_players[message["label"]]["x"] = message["x"]
-                        other_players[message["label"]]["y"] = message["y"]
-                elif message["status"] == "player_left":
-                    if message["label"] in other_players:
-                        del other_players[message["label"]]
-                        print(f"A player ({message['label']}) has left the room.")
-        except Exception as e:
-            print("Connection error:", e)
-            break
+# Enemy properties
+enemy_size = (40, 40)
+enemy_speed = 2
+initial_enemies = [
+    {'rect': pygame.Rect(150, 510, *enemy_size), 'direction': 1, 'platform': platforms[0]},
+    {'rect': pygame.Rect(450, 360, *enemy_size), 'direction': 1, 'platform': platforms[1]},
+    {'rect': pygame.Rect(650, 260, *enemy_size), 'direction': 1, 'platform': platforms[2]}
+]
+enemies = [enemy.copy() for enemy in initial_enemies]
 
 
-# Draw all players on the screen
-def draw_players():
-    # Draw this client's player
-    color = RED if player_data["color"] == "RED" else BLUE
-    pygame.draw.rect(screen, color, (player_data["x"], player_data["y"], *player_size))
-
-    # Draw other players
-    for player_id, pdata in other_players.items():
-        player_color = RED if pdata["color"] == "RED" else BLUE
-        pygame.draw.rect(screen, player_color, (pdata["x"], pdata["y"], *player_size))
-
-
-
-# Start receiving messages in a separate thread
-threading.Thread(target=receive_messages, daemon=True).start()
+def reset_game():
+    global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
+    player_pos = initial_player_pos[:]
+    player_health = 100
+    player_velocity = 0
+    damage_timer = 0
+    is_slashing = False
+    dash_timer = 0
+    double_jump_allowed = True
+    enemies = [enemy.copy() for enemy in initial_enemies]
 
 
-# Function to create a room
-def create_room():
-    message = {"action": "create_room"}
-    client_socket.send((json.dumps(message) + "\n").encode("utf-8"))  # Send message with newline
-    print("Sent create_room request to server.")
+def draw_platforms():
+    for platform in platforms:
+        pygame.draw.rect(screen, RED, platform)
 
 
-# Function to join a room
-def join_room(room_id):
-    message = {"action": "join_room", "room_id": room_id}
-    client_socket.send((json.dumps(message) + "\n").encode("utf-8"))  # Send message with newline
-    print("Sent join_room request to server.")
-
-
-# Function to send player data to the server
-def send_data():
-    while True:
-        try:
-            if current_room_id:
-                player_data_message = {
-                    "action": "update_player_data",
-                    "room_id": current_room_id,
-                    "player_data": player_data
-                }
-                client_socket.send((json.dumps(player_data_message) + "\n").encode("utf-8"))
-        except Exception as e:
-            print("Error sending data:", e)
-            break
-
-
-# Start sending player data in a separate thread
-threading.Thread(target=send_data, daemon=True).start()
-
-
-# Display the main menu for room creation and joining
-def main_menu():
-    menu_font = pygame.font.Font(None, 36)
-    input_box = pygame.Rect(300, 250, 200, 50)
-    color_inactive = pygame.Color('lightskyblue3')
-    color_active = pygame.Color('dodgerblue2')
-    color = color_inactive
-    active = False
-    text = ""
-    menu_message = "Enter 'create' to create a room or Room ID to join"
-
-    while True:
-        screen.fill(WHITE)
-        menu_text = menu_font.render(menu_message, True, BLACK)
-        screen.blit(menu_text, (150, 150))
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # Toggle the input box
-                if input_box.collidepoint(event.pos):
-                    active = not active
-                else:
-                    active = False
-                color = color_active if active else color_inactive
-            elif event.type == pygame.KEYDOWN:
-                if active:
-                    if event.key == pygame.K_RETURN:
-                        if text.lower() == "create":
-                            create_room()
-                        else:
-                            join_room(text)
-                        text = ""
-                    elif event.key == pygame.K_BACKSPACE:
-                        text = text[:-1]
-                    else:
-                        text += event.unicode
-
-        txt_surface = menu_font.render(text, True, color)
-        width = max(200, txt_surface.get_width() + 10)
-        input_box.w = width
-        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
-        pygame.draw.rect(screen, color, input_box, 2)
-
-        pygame.display.flip()
-        clock.tick(30)
-
-        # Exit the menu once we've joined or created a room
-        if current_room_id:
-            break
-
-
-# Player movement
 def handle_player_movement(keys_pressed):
-    global player_data
-    if keys_pressed[pygame.K_a]:  # Move left
-        player_data["x"] -= player_speed
-    if keys_pressed[pygame.K_d]:  # Move right
-        player_data["x"] += player_speed
-    if keys_pressed[pygame.K_w]:  # Jump
-        if player_data["on_ground"]:
-            player_data["velocity"] = jump_height
-            player_data["on_ground"] = False
-            player_data["double_jump_allowed"] = True
-        elif player_data["double_jump_allowed"]:
-            player_data["velocity"] = jump_height
-            player_data["double_jump_allowed"] = False
-    player_data["velocity"] += gravity
-    player_data["y"] += player_data["velocity"]
+    global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer
 
-    # Ground collision
-    if player_data["y"] > 500:
-        player_data["y"] = 500
-        player_data["on_ground"] = True
-        player_data["velocity"] = 0
+    # Horizontal movement
+    if keys_pressed[pygame.K_LEFT] and player_pos[0] > 0:
+        player_pos[0] -= player_speed
+    if keys_pressed[pygame.K_RIGHT] and player_pos[0] < WIDTH - player_size[0]:
+        player_pos[0] += player_speed
+
+    # Jump and double jump
+    if keys_pressed[pygame.K_SPACE]:
+        if on_ground:
+            player_velocity = jump_height
+            on_ground = False
+            double_jump_allowed = True
+        elif double_jump_allowed:
+            player_velocity = jump_height
+            double_jump_allowed = False
+
+    # Dash
+    if keys_pressed[pygame.K_d] and dash_timer == 0:
+        dash_direction = player_speed if keys_pressed[pygame.K_RIGHT] else -player_speed
+        player_pos[0] += dash_direction * dash_speed
+        dash_timer = dash_cooldown
+
+    # Slash attack
+    if keys_pressed[pygame.K_z] and not is_slashing:
+        is_slashing = True
+        slash_timer = slash_duration
+
+    # Handle slash timer countdown
+    if is_slashing:
+        slash_timer -= 1
+        if slash_timer <= 0:
+            is_slashing = False
+
+    # Gravity and vertical movement
+    player_velocity += gravity
+    player_pos[1] += player_velocity
+
+    # Collision detection with platforms
+    on_ground = False
+    player_rect = pygame.Rect(player_pos[0], player_pos[1], *player_size)
+    for platform in platforms:
+        if player_rect.colliderect(platform) and player_velocity > 0:
+            player_pos[1] = platform.top - player_size[1]
+            player_velocity = 0
+            on_ground = True
+
+    # Dash cooldown
+    if dash_timer > 0:
+        dash_timer -= 1
 
 
-# Draw all players on the screen
-def draw_players():
-    # Draw this client's player using the player image
-    screen.blit(player_image, (player_data["x"], player_data["y"]))
+def handle_enemies():
+    global player_health, damage_timer
 
-    # Draw other players
-    for player_id, pdata in other_players.items():
-        if player_id != str(client_socket.getsockname()[1]):  # Avoid drawing this client twice
-            # Load and draw a different image for other players
-            color = RED if pdata["color"] == "RED" else "BLUE"
-            other_player_image = pygame.image.load("player.png")  # You can load another PNG image if desired
-            other_player_image = pygame.transform.scale(other_player_image, player_size)
-            screen.blit(other_player_image, (pdata["x"], pdata["y"]))
+    for enemy in enemies:
+        enemy_rect = enemy['rect']
+        platform = enemy['platform']
+
+        # Move enemy back and forth
+        enemy_rect.x += enemy_speed * enemy['direction']
+
+        # Reverse direction if the enemy hits the edge of the platform
+        if enemy_rect.left <= platform.left or enemy_rect.right >= platform.right:
+            enemy['direction'] *= -1
+
+        # Check for collision with player
+        player_rect = pygame.Rect(player_pos[0], player_pos[1], *player_size)
+        if player_rect.colliderect(enemy_rect):
+            if is_slashing:
+                enemies.remove(enemy)  # Remove enemy if hit by slash
+            elif damage_timer == 0:
+                player_health -= 10  # Reduce health if enemy touches player
+                damage_timer = damage_cooldown  # Reset damage cooldown
+
+    # Decrease damage cooldown timer
+    if damage_timer > 0:
+        damage_timer -= 1
 
 
-# Game Loop
-def game_loop():
-    while True:
-        screen.fill(WHITE)
+def draw_enemies():
+    for enemy in enemies:
+        pygame.draw.rect(screen, GREEN, enemy['rect'])
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
 
-        # Get player input
+def draw_health_bar():
+    pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
+    pygame.draw.rect(screen, RED, (12, 12, player_health, 20))
+
+
+def draw_game_over_screen():
+    game_over_font = pygame.font.Font(None, 72)
+    game_over_text = game_over_font.render("Game Over", True, BLACK)
+    screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 100))
+
+
+# Main game loop
+running = True
+while running:
+    clock.tick(FPS)
+    screen.fill(WHITE)
+
+    # Event handling
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+            reset_game()
+
+    # Check for game over
+    if player_health <= 0:
+        draw_game_over_screen()
+    else:
+        # Player movement
         keys_pressed = pygame.key.get_pressed()
         handle_player_movement(keys_pressed)
 
-        # Draw elements on the screen
-        draw_players()
+        # Enemy movement and interaction
+        handle_enemies()
 
-        pygame.display.flip()
-        clock.tick(FPS)
+        # Draw player, platforms, enemies, and health bar
+        pygame.draw.rect(screen, player_color, (*player_pos, *player_size))
+        draw_platforms()
+        draw_enemies()
+        draw_health_bar()
 
+        # Display slash visual feedback
+        if is_slashing:
+            slash_rect = pygame.Rect(player_pos[0] - 10, player_pos[1], player_size[0] + 20, player_size[1])
+            pygame.draw.rect(screen, (200, 200, 255), slash_rect, 3)
 
-# Main Program Flow
-main_menu()
-game_loop()
+    pygame.display.flip()
