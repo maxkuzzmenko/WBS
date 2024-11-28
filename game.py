@@ -15,7 +15,7 @@ BLACK = (0, 0, 0)
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Platformer Game with Double Jump and Dash")
+pygame.display.set_caption("the game")
 clock = pygame.time.Clock()
 
 # Player properties
