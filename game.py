@@ -38,6 +38,7 @@ slash_duration = 10
 player_health = 100
 damage_cooldown = 30
 damage_timer = 0
+player_facing_right = True  # Default facing direction is right
 
 # Load and scale the player image
 player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
@@ -79,13 +80,15 @@ def draw_platforms():
 
 
 def handle_player_movement(keys_pressed):
-    global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer
+    global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right
 
     # Horizontal movement
     if keys_pressed[pygame.K_LEFT] and player_pos[0] > 0:
         player_pos[0] -= player_speed
+        player_facing_right = False  # Facing left
     if keys_pressed[pygame.K_RIGHT] and player_pos[0] < WIDTH - player_size[0]:
         player_pos[0] += player_speed
+        player_facing_right = True  # Facing right
 
     # Jump and double jump
     if keys_pressed[pygame.K_SPACE]:
@@ -206,8 +209,12 @@ while running:
         draw_enemies()
         draw_health_bar()
 
-        # Replace rectangle with the player image
-        screen.blit(player_image, player_pos)
+        # Replace rectangle with the player image, flipped if needed
+        if player_facing_right:
+            screen.blit(player_image, player_pos)
+        else:
+            flipped_image = pygame.transform.flip(player_image, True, False)  # Flip horizontally
+            screen.blit(flipped_image, player_pos)
 
         # Display slash visual feedback
         if is_slashing:
