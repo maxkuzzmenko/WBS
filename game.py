@@ -39,6 +39,10 @@ player_health = 100
 damage_cooldown = 30
 damage_timer = 0
 
+# Load and scale the player image
+player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
+player_image = pygame.transform.scale(player_image, player_size)
+
 # Platform properties
 platforms = [
     pygame.Rect(100, 550, 200, 10),
@@ -197,11 +201,13 @@ while running:
         # Enemy movement and interaction
         handle_enemies()
 
-        # Draw player, platforms, enemies, and health bar
-        pygame.draw.rect(screen, player_color, (*player_pos, *player_size))
+        # Draw platforms, enemies, health bar, and player
         draw_platforms()
         draw_enemies()
         draw_health_bar()
+
+        # Replace rectangle with the player image
+        screen.blit(player_image, player_pos)
 
         # Display slash visual feedback
         if is_slashing:
