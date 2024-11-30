@@ -46,9 +46,9 @@ player_image = pygame.transform.scale(player_image, player_size)
 
 # Platform properties
 platforms = [
-    pygame.Rect(100, 550, 200, 10),
-    pygame.Rect(400, 400, 200, 10),
-    pygame.Rect(600, 300, 200, 10)
+    pygame.Rect(100, 550, 200, 100),
+    pygame.Rect(300, 400, 200, 200),
+    pygame.Rect(500, 300, 200, 100)
 ]
 
 # Enemy properties
@@ -96,8 +96,8 @@ def handle_player_movement(keys_pressed):
             player_velocity = jump_height
             on_ground = False
             double_jump_allowed = True
-        elif double_jump_allowed:
-            player_velocity = jump_height
+        elif double_jump_allowed and keys_pressed[pygame.K_SPACE]:
+            player_velocity = jump_height + player_velocity
             double_jump_allowed = False
 
     # Dash
@@ -180,6 +180,10 @@ def draw_game_over_screen():
 
 
 # Main game loop
+# Add a paused state variable
+paused = False
+
+# Main game loop
 running = True
 while running:
     clock.tick(FPS)
@@ -190,8 +194,20 @@ while running:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-            reset_game()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r:
+                reset_game()
+            elif event.key == pygame.K_s:
+                paused = not paused  # Toggle paused state
+
+    # Pause logic
+    if paused:
+        # Display a "Paused" message on the screen
+        paused_font = pygame.font.Font(None, 72)
+        paused_text = paused_font.render("Paused", True, BLACK)
+        screen.blit(paused_text, (WIDTH // 2 - paused_text.get_width() // 2, HEIGHT // 2 - 50))
+        pygame.display.flip()
+        continue  # Skip the rest of the game logic when paused
 
     # Check for game over
     if player_health <= 0:
