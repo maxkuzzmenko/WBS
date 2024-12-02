@@ -76,6 +76,18 @@ fake_spike_platforms = [
     pygame.Rect(200, 550, 100, 10)  # Example of a fake spike platform
 ]
 
+second_level_platforms = [
+    pygame.Rect(100, 550, 200, 30),
+    pygame.Rect(400, 450, 200, 30),
+    pygame.Rect(700, 350, 200, 30),
+]
+
+def draw_second_level():
+    for platform in second_level_platforms:
+        pygame.draw.rect(screen, GREEN, platform)
+
+
+
 def reset_game():
     global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
     player_pos = initial_player_pos[:]
@@ -220,7 +232,9 @@ def draw_game_over_screen():
 # Main game loop
 paused = False
 
+# Main game loop
 running = True
+on_second_level = False  # Track if we are on the second level
 while running:
     clock.tick(FPS)
     screen.fill(WHITE)
@@ -236,9 +250,13 @@ while running:
             elif event.key == pygame.K_s:
                 paused = not paused  # Toggle paused state
 
-    # Pause logic
+    # Switch to second level when player reaches Y > 650
+    if player_pos[1] > 650 and not on_second_level:
+        on_second_level = True
+        platforms = second_level_platforms  # Switch to the second level platforms
+
+    # Game logic here
     if paused:
-        # Display a "Paused" message on the screen
         paused_font = pygame.font.Font(None, 72)
         paused_text = paused_font.render("Paused", True, BLACK)
         screen.blit(paused_text, (WIDTH // 2 - paused_text.get_width() // 2, HEIGHT // 2 - 50))
@@ -253,26 +271,29 @@ while running:
         keys_pressed = pygame.key.get_pressed()
         handle_player_movement(keys_pressed)
 
-        # Enemy movement and interaction
-        handle_enemies()
+    # Enemy movement and interaction
+    handle_enemies()
 
-        # Draw platforms, enemies, health bar, and player
-        draw_platforms()
-        draw_spike_platforms()  # Draw spike platforms
-        draw_fake_spike_platforms()  # Draw fake spike platforms
-        draw_enemies()  # Draw enemies with their textures
-        draw_health_bar()
+    # Draw platforms, enemies, health bar, and player
+    if on_second_level:
+        draw_second_level()  # Draw second-level platforms
+    else:
+        draw_platforms()  # Draw first-level platforms
+    draw_spike_platforms()
+    draw_fake_spike_platforms()
+    draw_enemies()
+    draw_health_bar()
 
-        # Replace rectangle with the player image, flipped if needed
-        if player_facing_right:
-            screen.blit(player_image, player_pos)
-        else:
-            flipped_image = pygame.transform.flip(player_image, True, False)  # Flip horizontally
-            screen.blit(flipped_image, player_pos)
+    # Draw player image
+    if player_facing_right:
+        screen.blit(player_image, player_pos)
+    else:
+        flipped_image = pygame.transform.flip(player_image, True, False)
+        screen.blit(flipped_image, player_pos)
 
-        # Display slash visual feedback
-        if is_slashing:
-            slash_rect = pygame.Rect(player_pos[0] - 10, player_pos[1], player_size[0] + 20, player_size[1])
-            pygame.draw.rect(screen, (200, 200, 255), slash_rect, 3)
+    # Display slash visual feedback
+    if is_slashing:
+        slash_rect = pygame.Rect(player_pos[0] - 10, player_pos[1], player_size[0] + 20, player_size[1])
+        pygame.draw.rect(screen, (200, 200, 255), slash_rect, 3)
 
     pygame.display.flip()
