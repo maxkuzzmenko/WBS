@@ -12,10 +12,11 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
+SPIKE_COLOR = (255, 0, 255)  # Color for spike platforms
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("the game")
+pygame.display.set_caption("The Game")
 clock = pygame.time.Clock()
 
 # Player properties
@@ -44,23 +45,28 @@ player_facing_right = True  # Default facing direction is right
 player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
 player_image = pygame.transform.scale(player_image, player_size)
 
-# Platform properties
+# Regular platform properties
 platforms = [
-    pygame.Rect(100, 550, 200, 100),
+    pygame.Rect(0, 500, 200, 100),
     pygame.Rect(300, 400, 200, 200),
-    pygame.Rect(500, 300, 200, 100)
+    pygame.Rect(600, 300, 200, 300),
+]
+
+# Spike platform properties
+spike_platforms = [
+    pygame.Rect(200, 550, 100, 10),  # Example of a spike platform
+    pygame.Rect(500, 450, 100, 10)   # Another spike platform
 ]
 
 # Enemy properties
 enemy_size = (40, 40)
 enemy_speed = 2
 initial_enemies = [
-    {'rect': pygame.Rect(150, 510, *enemy_size), 'direction': 1, 'platform': platforms[0]},
+    {'rect': pygame.Rect(150, 460, *enemy_size), 'direction': 1, 'platform': platforms[0]},
     {'rect': pygame.Rect(450, 360, *enemy_size), 'direction': 1, 'platform': platforms[1]},
     {'rect': pygame.Rect(650, 260, *enemy_size), 'direction': 1, 'platform': platforms[2]}
 ]
 enemies = [enemy.copy() for enemy in initial_enemies]
-
 
 def reset_game():
     global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
@@ -73,11 +79,13 @@ def reset_game():
     double_jump_allowed = True
     enemies = [enemy.copy() for enemy in initial_enemies]
 
-
 def draw_platforms():
     for platform in platforms:
-        pygame.draw.rect(screen, RED, platform)
+        pygame.draw.rect(screen, BLUE, platform)
 
+def draw_spike_platforms():
+    for spike in spike_platforms:
+        pygame.draw.rect(screen, SPIKE_COLOR, spike)
 
 def handle_player_movement(keys_pressed):
     global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right
@@ -95,10 +103,6 @@ def handle_player_movement(keys_pressed):
         if on_ground:
             player_velocity = jump_height
             on_ground = False
-            double_jump_allowed = True
-        elif double_jump_allowed and keys_pressed[pygame.K_SPACE]:
-            player_velocity = jump_height + player_velocity
-            double_jump_allowed = False
 
     # Dash
     if keys_pressed[pygame.K_d] and dash_timer == 0:
@@ -130,10 +134,14 @@ def handle_player_movement(keys_pressed):
             player_velocity = 0
             on_ground = True
 
+    # Collision detection with spike platforms (reset the game if touched)
+    for spike in spike_platforms:
+        if player_rect.colliderect(spike):
+            reset_game()
+
     # Dash cooldown
     if dash_timer > 0:
         dash_timer -= 1
-
 
 def handle_enemies():
     global player_health, damage_timer
@@ -162,28 +170,22 @@ def handle_enemies():
     if damage_timer > 0:
         damage_timer -= 1
 
-
 def draw_enemies():
     for enemy in enemies:
         pygame.draw.rect(screen, GREEN, enemy['rect'])
 
-
 def draw_health_bar():
     pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
     pygame.draw.rect(screen, RED, (12, 12, player_health, 20))
-
 
 def draw_game_over_screen():
     game_over_font = pygame.font.Font(None, 72)
     game_over_text = game_over_font.render("Game Over", True, BLACK)
     screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 100))
 
-
 # Main game loop
-# Add a paused state variable
 paused = False
 
-# Main game loop
 running = True
 while running:
     clock.tick(FPS)
@@ -222,6 +224,7 @@ while running:
 
         # Draw platforms, enemies, health bar, and player
         draw_platforms()
+        draw_spike_platforms()  # Draw spike platforms
         draw_enemies()
         draw_health_bar()
 
