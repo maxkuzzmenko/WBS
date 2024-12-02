@@ -78,15 +78,13 @@ fake_spike_platforms = [
 
 second_level_platforms = [
     pygame.Rect(100, 550, 200, 30),
-    pygame.Rect(400, 450, 200, 30),
+    pygame.Rect(300, 450, 200, 30),
     pygame.Rect(700, 350, 200, 30),
 ]
 
 def draw_second_level():
     for platform in second_level_platforms:
         pygame.draw.rect(screen, GREEN, platform)
-
-
 
 def reset_game():
     global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
@@ -238,7 +236,7 @@ on_second_level = False  # Track if we are on the second level
 while running:
     clock.tick(FPS)
     screen.fill(WHITE)
-
+    print(player_pos)
     # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -253,7 +251,9 @@ while running:
     # Switch to second level when player reaches Y > 650
     if player_pos[1] > 650 and not on_second_level:
         on_second_level = True
-        platforms = second_level_platforms  # Switch to the second level platforms
+        platforms = second_level_platforms# Switch to the second level platforms
+        player_pos[0] = 100
+        player_pos[1] = 0
 
     # Game logic here
     if paused:
