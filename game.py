@@ -94,7 +94,7 @@ def draw_spike_platforms():
 
 
 def handle_player_movement(keys_pressed):
-    global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right
+    global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right, player_health
 
     # Horizontal movement
     if keys_pressed[pygame.K_LEFT] and player_pos[0] > 0:
@@ -139,11 +139,13 @@ def handle_player_movement(keys_pressed):
             player_pos[1] = platform.top - player_size[1]
             player_velocity = 0
             on_ground = True
+            # When the player collides with a platform, subtract 200 HP
+
 
     # Collision detection with spike platforms (reset the game if touched)
     for spike in spike_platforms:
         if player_rect.colliderect(spike):
-            player_health = 0
+            player_health -= 200
 
     # Dash cooldown
     if dash_timer > 0:
