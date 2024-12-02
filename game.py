@@ -16,7 +16,7 @@ PURPLE = (255, 0, 255)  # Color for spike platforms
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("The Game")
+pygame.display.set_caption("Joe: te Game")
 clock = pygame.time.Clock()
 
 # Player properties
@@ -63,13 +63,18 @@ player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Re
 player_image = pygame.transform.scale(player_image, player_size)
 enemy_image = pygame.image.load("character images/enemy_v.2.png")  # Replace with your enemy image
 enemy_image = pygame.transform.scale(enemy_image, enemy_size)
+player_dash_image = pygame.image.load("character images/dinodashnr.1.png")
+player_dash_image = pygame.transform.scale(player_dash_image, player_size)
+
 
 # Spike platform properties
 spike_platforms = [
-    pygame.Rect(200, 550, 100, 10),  # Example of a spike platform
     pygame.Rect(500, 450, 100, 10)  # Another spike platform
 ]
 
+fake_spike_platforms = [
+    pygame.Rect(200, 550, 100, 10)  # Example of a fake spike platform
+]
 
 def reset_game():
     global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
@@ -87,10 +92,13 @@ def draw_platforms():
     for platform in platforms:
         pygame.draw.rect(screen, BLUE, platform)
 
-
 def draw_spike_platforms():
     for spike in spike_platforms:
         pygame.draw.rect(screen, PURPLE, spike)
+
+def draw_fake_spike_platforms():
+    for fake_spikes in fake_spike_platforms:  # Corrected this line
+        pygame.draw.rect(screen, PURPLE, fake_spikes)
 
 
 def handle_player_movement(keys_pressed):
@@ -109,6 +117,9 @@ def handle_player_movement(keys_pressed):
         if on_ground:
             player_velocity = jump_height
             on_ground = False
+        elif double_jump_allowed:
+            player_velocity = jump_height
+            double_jump_allowed = False  # Disable further jumps
 
     # Dash
     if keys_pressed[pygame.K_d] and dash_timer == 0:
@@ -139,13 +150,17 @@ def handle_player_movement(keys_pressed):
             player_pos[1] = platform.top - player_size[1]
             player_velocity = 0
             on_ground = True
-            # When the player collides with a platform, subtract 200 HP
-
+            double_jump_allowed = True  # Allow for double jump again when landing on platform
 
     # Collision detection with spike platforms (reset the game if touched)
     for spike in spike_platforms:
         if player_rect.colliderect(spike):
             player_health -= 200
+
+    # Collision detection with fake spike platforms (take damage, but don't reset the game)
+    for fake_spike in fake_spike_platforms:
+        if player_rect.colliderect(fake_spike):
+            player_health -= 10  # Take lesser damage on fake spikes
 
     # Dash cooldown
     if dash_timer > 0:
@@ -244,6 +259,7 @@ while running:
         # Draw platforms, enemies, health bar, and player
         draw_platforms()
         draw_spike_platforms()  # Draw spike platforms
+        draw_fake_spike_platforms()  # Draw fake spike platforms
         draw_enemies()  # Draw enemies with their textures
         draw_health_bar()
 
