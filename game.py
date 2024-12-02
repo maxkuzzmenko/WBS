@@ -12,7 +12,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
-SPIKE_COLOR = (255, 0, 255)  # Color for spike platforms
+PURPLE = (255, 0, 255)  # Color for spike platforms
 
 # Screen and Clock
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -41,21 +41,11 @@ damage_cooldown = 30
 damage_timer = 0
 player_facing_right = True  # Default facing direction is right
 
-# Load and scale the player image
-player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
-player_image = pygame.transform.scale(player_image, player_size)
-
 # Regular platform properties
 platforms = [
     pygame.Rect(0, 500, 200, 100),
     pygame.Rect(300, 400, 200, 200),
     pygame.Rect(600, 300, 200, 300),
-]
-
-# Spike platform properties
-spike_platforms = [
-    pygame.Rect(200, 550, 100, 10),  # Example of a spike platform
-    pygame.Rect(500, 450, 100, 10)   # Another spike platform
 ]
 
 # Enemy properties
@@ -68,6 +58,19 @@ initial_enemies = [
 ]
 enemies = [enemy.copy() for enemy in initial_enemies]
 
+# Load and scale the player image
+player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
+player_image = pygame.transform.scale(player_image, player_size)
+enemy_image = pygame.image.load("character images/enemy_v.2.png")  # Replace with your enemy image
+enemy_image = pygame.transform.scale(enemy_image, enemy_size)
+
+# Spike platform properties
+spike_platforms = [
+    pygame.Rect(200, 550, 100, 10),  # Example of a spike platform
+    pygame.Rect(500, 450, 100, 10)  # Another spike platform
+]
+
+
 def reset_game():
     global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
     player_pos = initial_player_pos[:]
@@ -79,13 +82,16 @@ def reset_game():
     double_jump_allowed = True
     enemies = [enemy.copy() for enemy in initial_enemies]
 
+
 def draw_platforms():
     for platform in platforms:
         pygame.draw.rect(screen, BLUE, platform)
 
+
 def draw_spike_platforms():
     for spike in spike_platforms:
-        pygame.draw.rect(screen, SPIKE_COLOR, spike)
+        pygame.draw.rect(screen, PURPLE, spike)
+
 
 def handle_player_movement(keys_pressed):
     global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right
@@ -137,11 +143,12 @@ def handle_player_movement(keys_pressed):
     # Collision detection with spike platforms (reset the game if touched)
     for spike in spike_platforms:
         if player_rect.colliderect(spike):
-            reset_game()
+            player_health = 0
 
     # Dash cooldown
     if dash_timer > 0:
         dash_timer -= 1
+
 
 def handle_enemies():
     global player_health, damage_timer
@@ -170,18 +177,28 @@ def handle_enemies():
     if damage_timer > 0:
         damage_timer -= 1
 
+
 def draw_enemies():
     for enemy in enemies:
-        pygame.draw.rect(screen, GREEN, enemy['rect'])
+        enemy_rect = enemy['rect']
+        # Flip the enemy image based on the direction they are facing
+        flipped_enemy_image = enemy_image
+        if enemy['direction'] == -1:  # If enemy is moving left, flip the image
+            flipped_enemy_image = pygame.transform.flip(enemy_image, True, False)
+
+        screen.blit(flipped_enemy_image, enemy_rect)  # Draw the flipped image or original image
+
 
 def draw_health_bar():
     pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
     pygame.draw.rect(screen, RED, (12, 12, player_health, 20))
 
+
 def draw_game_over_screen():
     game_over_font = pygame.font.Font(None, 72)
     game_over_text = game_over_font.render("Game Over", True, BLACK)
     screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 100))
+
 
 # Main game loop
 paused = False
@@ -225,7 +242,7 @@ while running:
         # Draw platforms, enemies, health bar, and player
         draw_platforms()
         draw_spike_platforms()  # Draw spike platforms
-        draw_enemies()
+        draw_enemies()  # Draw enemies with their textures
         draw_health_bar()
 
         # Replace rectangle with the player image, flipped if needed
