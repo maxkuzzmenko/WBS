@@ -67,6 +67,13 @@ player_dash_image = pygame.image.load("character images/dinodashnr.1.png")
 player_dash_image = pygame.transform.scale(player_dash_image, player_size)
 background_image = pygame.image.load("envpic/hintergrund_v.2.png")
 background_image = pygame.transform.scale(background_image, (WIDTH, HEIGHT))
+platform_texture_top = pygame.image.load("envpic/stein_oben_v.5png.png")
+platform_texture_bottom = pygame.image.load("envpic/stein_connecting_v.2.png")
+platform_width_top = platform_texture_top.get_width()
+platform_width_bottom = platform_texture_bottom.get_width()
+platform_height_bottom = platform_texture_bottom.get_height()
+
+
 
 
 # Spike platform properties (for first level)
@@ -80,10 +87,10 @@ fake_spike_platforms = [
 
 # Second level properties
 second_level_platforms = [
-    pygame.Rect(0, 550, 800, 30),
-    pygame.Rect(300, 450, 200, 30),
-    pygame.Rect(600, 350, 200, 30),
-    pygame.Rect(300, 200, 200, 30),
+    pygame.Rect(0, 550, 800, 50),
+    pygame.Rect(300, 450, 200, 50),
+    pygame.Rect(600, 350, 200, 50),
+    pygame.Rect(300, 200, 200, 50),
 ]
 
 # Second level enemies and spikes
@@ -127,12 +134,20 @@ def draw_second_level():
         pygame.draw.rect(screen, GREEN, platform)
     for spike in second_level_spike_platforms:
         pygame.draw.rect(screen, PURPLE, spike)
+#     screen.blit("")
 
 
 
 def draw_platforms():
     for platform in platforms:
-        pygame.draw.rect(screen, BLUE, platform)
+        # Draw the top texture across the width of the platform
+        for i in range((platform.width // platform_width_top) + 1):  # +1 ensures full coverage
+            screen.blit(platform_texture_top, (platform.x + i * platform_width_top, platform.y))
+
+        # Draw the bottom/base texture to fill the entire height
+        for i in range((platform.width // platform_width_bottom) + 1):  # +1 ensures no gaps
+            for j in range((platform.height // platform_height_bottom) + 1):  # Fill the height as well
+                screen.blit(platform_texture_bottom, (platform.x + i * platform_width_bottom, platform.y + j * platform_height_bottom))
 
 def draw_spike_platforms():
     for spike in spike_platforms:
