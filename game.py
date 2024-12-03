@@ -41,7 +41,7 @@ damage_cooldown = 30
 damage_timer = 0
 player_facing_right = True  # Default facing direction is right
 
-# Regular platform properties
+# Regular platform properties (for first level)
 platforms = [
     pygame.Rect(0, 500, 200, 100),
     pygame.Rect(300, 400, 200, 200),
@@ -65,9 +65,11 @@ enemy_image = pygame.image.load("character images/enemy_v.2.png")  # Replace wit
 enemy_image = pygame.transform.scale(enemy_image, enemy_size)
 player_dash_image = pygame.image.load("character images/dinodashnr.1.png")
 player_dash_image = pygame.transform.scale(player_dash_image, player_size)
+background_image = pygame.image.load("envpic/hintergrund_v.2.png")
+background_image = pygame.transform.scale(background_image, (WIDTH, HEIGHT))
 
 
-# Spike platform properties
+# Spike platform properties (for first level)
 spike_platforms = [
     pygame.Rect(500, 450, 100, 10)  # Another spike platform
 ]
@@ -76,18 +78,29 @@ fake_spike_platforms = [
     pygame.Rect(200, 550, 100, 10)  # Example of a fake spike platform
 ]
 
+# Second level properties
 second_level_platforms = [
-    pygame.Rect(100, 550, 200, 30),
+    pygame.Rect(0, 550, 800, 30),
     pygame.Rect(300, 450, 200, 30),
-    pygame.Rect(700, 350, 200, 30),
+    pygame.Rect(600, 350, 200, 30),
+    pygame.Rect(300, 200, 200, 30),
 ]
 
-def draw_second_level():
-    for platform in second_level_platforms:
-        pygame.draw.rect(screen, GREEN, platform)
+# Second level enemies and spikes
+second_level_enemies = [
+    {'rect': pygame.Rect(0, 460, *enemy_size), 'direction': 1, 'platform': second_level_platforms[0]},
+    {'rect': pygame.Rect(450, 360, *enemy_size), 'direction': 1, 'platform': second_level_platforms[1]},
+    {'rect': pygame.Rect(650, 260, *enemy_size), 'direction': 1, 'platform': second_level_platforms[2]}
+]
 
+second_level_spike_platforms = [
+    pygame.Rect(500, 250, 100, 10),
+    pygame.Rect(200, 150, 100, 10)
+]
+
+# Reset the game (for both levels)
 def reset_game():
-    global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed
+    global player_pos, player_health, enemies, player_velocity, damage_timer, is_slashing, dash_timer, double_jump_allowed, spike_platforms
     player_pos = initial_player_pos[:]
     player_health = 100
     player_velocity = 0
@@ -96,7 +109,24 @@ def reset_game():
     dash_timer = 0
     double_jump_allowed = True
     enemies = [enemy.copy() for enemy in initial_enemies]
+    spike_platforms = [
+        pygame.Rect(500, 450, 100, 10)  # Reset the spike platforms for the first level
+    ]
 
+# Handle the second level (set up new enemies and spikes)
+def handle_second_level():
+    global enemies, spike_platforms
+    enemies = [enemy.copy() for enemy in second_level_enemies]  # Spawn second level enemies
+    spike_platforms = second_level_spike_platforms  # Spawn second level spikes
+
+
+
+# Draw second level platforms and spikes
+def draw_second_level():
+    for platform in second_level_platforms:
+        pygame.draw.rect(screen, GREEN, platform)
+    for spike in second_level_spike_platforms:
+        pygame.draw.rect(screen, PURPLE, spike)
 
 def draw_platforms():
     for platform in platforms:
@@ -110,7 +140,7 @@ def draw_fake_spike_platforms():
     for fake_spikes in fake_spike_platforms:  # Corrected this line
         pygame.draw.rect(screen, PURPLE, fake_spikes)
 
-
+# Handle player movement
 def handle_player_movement(keys_pressed):
     global player_velocity, on_ground, is_slashing, slash_timer, double_jump_allowed, dash_timer, player_facing_right, player_health
 
@@ -164,7 +194,7 @@ def handle_player_movement(keys_pressed):
 
     # Collision detection with spike platforms (reset the game if touched)
     for spike in spike_platforms:
-        if player_rect.colliderect(spike):
+        if player_rect.colliderect(spike or second_level_spike_platforms):
             player_health -= 200
 
     # Collision detection with fake spike platforms (take damage, but don't reset the game)
@@ -176,7 +206,7 @@ def handle_player_movement(keys_pressed):
     if dash_timer > 0:
         dash_timer -= 1
 
-
+# Handle enemies
 def handle_enemies():
     global player_health, damage_timer
 
@@ -196,7 +226,7 @@ def handle_enemies():
         if player_rect.colliderect(enemy_rect):
             if is_slashing:
                 enemies.remove(enemy)  # Remove enemy if hit by slash
-            elif damage_timer == 0:
+            elif damage_timer == 30:
                 player_health -= 10  # Reduce health if enemy touches player
                 damage_timer = damage_cooldown  # Reset damage cooldown
 
@@ -204,7 +234,7 @@ def handle_enemies():
     if damage_timer > 0:
         damage_timer -= 1
 
-
+# Draw enemies
 def draw_enemies():
     for enemy in enemies:
         enemy_rect = enemy['rect']
@@ -215,27 +245,26 @@ def draw_enemies():
 
         screen.blit(flipped_enemy_image, enemy_rect)  # Draw the flipped image or original image
 
-
+# Draw health bar
 def draw_health_bar():
     pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
     pygame.draw.rect(screen, RED, (12, 12, player_health, 20))
 
-
+# Draw game over screen
 def draw_game_over_screen():
     game_over_font = pygame.font.Font(None, 72)
     game_over_text = game_over_font.render("Game Over", True, BLACK)
     screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 100))
 
-
 # Main game loop
 paused = False
-
-# Main game loop
 running = True
 on_second_level = False  # Track if we are on the second level
+
 while running:
     clock.tick(FPS)
     screen.fill(WHITE)
+    screen.blit(background_image, (0, 0))
     print(player_pos)
     # Event handling
     for event in pygame.event.get():
@@ -251,7 +280,8 @@ while running:
     # Switch to second level when player reaches Y > 650
     if player_pos[1] > 650 and not on_second_level:
         on_second_level = True
-        platforms = second_level_platforms# Switch to the second level platforms
+        platforms = second_level_platforms  # Switch to the second level platforms
+        handle_second_level()  # Set up enemies and spikes for the second level
         player_pos[0] = 100
         player_pos[1] = 0
 
@@ -276,7 +306,7 @@ while running:
 
     # Draw platforms, enemies, health bar, and player
     if on_second_level:
-        draw_second_level()  # Draw second-level platforms
+        draw_second_level()  # Draw second-level platforms and spikes
     else:
         draw_platforms()  # Draw first-level platforms
     draw_spike_platforms()
