@@ -128,6 +128,8 @@ def draw_second_level():
     for spike in second_level_spike_platforms:
         pygame.draw.rect(screen, PURPLE, spike)
 
+
+
 def draw_platforms():
     for platform in platforms:
         pygame.draw.rect(screen, BLUE, platform)
@@ -251,8 +253,21 @@ def draw_enemies():
 
 # Draw health bar
 def draw_health_bar():
+    # Draw the background of the health bar
     pygame.draw.rect(screen, BLACK, (10, 10, 104, 24))
+
+    # Draw the current health bar (colored red)
     pygame.draw.rect(screen, RED, (12, 12, player_health, 20))
+
+    # Render the text for the health value
+    player_health_font = pygame.font.Font(None, 36)  # You can adjust the font size as needed
+    if player_health <= 0:
+        player_health_text = player_health_font.render("0", True, WHITE)
+    else:
+        player_health_text = player_health_font.render(str(player_health), True, WHITE)
+
+    # Blit the health text next to the health bar
+    screen.blit(player_health_text, (120, 15))  # Position the text just to the right of the health bar
 
 # Draw game over screen
 def draw_game_over_screen():
