@@ -61,7 +61,7 @@ enemies = [enemy.copy() for enemy in initial_enemies]
 # Load and scale the player image
 player_image = pygame.image.load("character images/cwayz dino nugget.png")  # Replace with your image file name
 player_image = pygame.transform.scale(player_image, player_size)
-enemy_image = pygame.image.load("character images/enemy_v.2.png")  # Replace with your enemy image
+enemy_image = pygame.image.load("character images/enemy.png")  # Replace with your enemy image
 enemy_image = pygame.transform.scale(enemy_image, enemy_size)
 player_dash_image = pygame.image.load("character images/dinodashnr.1.png")
 player_dash_image = pygame.transform.scale(player_dash_image, player_size)
@@ -200,11 +200,14 @@ def handle_player_movement(keys_pressed):
     # Collision detection with fake spike platforms (take damage, but don't reset the game)
     for fake_spike in fake_spike_platforms:
         if player_rect.colliderect(fake_spike):
-            player_health -= 10  # Take lesser damage on fake spikes
+            player_health -= 5  # Take lesser damage on fake spikes
 
     # Dash cooldown
     if dash_timer > 0:
         dash_timer -= 1
+
+    if player_pos[1] < 0 or player_pos[1] > 750:
+        player_health -= 150
 
 # Handle enemies
 def handle_enemies():
@@ -226,13 +229,14 @@ def handle_enemies():
         if player_rect.colliderect(enemy_rect):
             if is_slashing:
                 enemies.remove(enemy)  # Remove enemy if hit by slash
-            elif damage_timer == 30:
-                player_health -= 10  # Reduce health if enemy touches player
+            elif damage_timer == 0:
+                player_health -= 20  # Reduce health if enemy touches player
                 damage_timer = damage_cooldown  # Reset damage cooldown
 
     # Decrease damage cooldown timer
     if damage_timer > 0:
         damage_timer -= 1
+
 
 # Draw enemies
 def draw_enemies():
@@ -278,7 +282,7 @@ while running:
                 paused = not paused  # Toggle paused state
 
     # Switch to second level when player reaches Y > 650
-    if player_pos[1] > 650 and not on_second_level:
+    if player_pos[1] > 650 and not on_second_level and player_pos[0]> 190 and player_pos[0] < 250:
         on_second_level = True
         platforms = second_level_platforms  # Switch to the second level platforms
         handle_second_level()  # Set up enemies and spikes for the second level
