@@ -137,17 +137,19 @@ def draw_second_level():
 #     screen.blit("")
 
 
-
 def draw_platforms():
     for platform in platforms:
         # Draw the top texture across the width of the platform
-        for i in range((platform.width // platform_width_top)):
-            screen.blit(platform_texture_top, (platform.x + i * platform_width_top, platform.y -1))
+        for i in range(platform.width // platform_width_top):
+            screen.blit(platform_texture_top, (platform.x + i * platform_width_top, platform.y))
 
-        # Draw the bottom/base texture to fill the entire height
-        for i in range((platform.width // platform_width_bottom)):
-            for j in range((platform.height // platform_height_bottom)):  # Fill the height as well
-                screen.blit(platform_texture_bottom, (platform.x + i * platform_width_bottom, platform.y + j * platform_height_bottom))
+        # Draw the bottom/base texture from the bottom up to just below the top layer
+        for i in range(platform.width // platform_width_bottom):
+            for j in range((platform.height - platform_height_bottom) // platform_height_bottom):
+                # Ensure the bottom texture fills up from the bottom, up to the top layer
+                screen.blit(platform_texture_bottom, (platform.x + i * platform_width_bottom,
+                                                      platform.y + platform.height - (j + 1) * platform_height_bottom))
+
 
 def draw_spike_platforms():
     for spike in spike_platforms:
